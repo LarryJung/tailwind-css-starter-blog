@@ -10,442 +10,304 @@ bibliography: references-data.bib
 canonicalUrl: https://tailwind-nextjs-starter-blog.vercel.app/blog/new-features-in-v1/
 ---
 
-## Overview
-
-A post on the new features introduced in v1.0. New features:
-
-<TOCInline toc={props.toc} exclude="Overview" toHeading={2} />
-
-First load JS decreased from 43kB to 39kB despite all the new features added!^[With the new changes in Nextjs 12, first load JS increase to 45kB.]
-
-See [upgrade guide](#upgrade-guide) below if you are migrating from v0 version of the template.
-
-## Theme colors
-
-You can easily modify the theme color by changing the primary attribute in the tailwind config file:
-
-```js:tailwind.config.js
-theme: {
-    colors: {
-      primary: colors.teal,
-      gray: colors.neutral,
-      ...
-    }
-  ...
-}
-```
-
-The primary color attribute should be assigned an object with keys from 50, 100, 200 ... 900 and the corresponding color code values.
-
-Tailwind includes great default color palettes that can be used for theming your own website. Check out [customizing colors documentation page](https://tailwindcss.com/docs/customizing-colors) for the full range of options.
-
-Migrating from v1? You can revert to the previous theme by setting `primary` to `colors.sky` (Tailwind 2.2.2 and above, otherwise `colors.lightBlue`) and changing gray to `colors.gray`.
-
-From v1.1.2+, you can also customize the style of your code blocks easily by modifying the `css/prism.css` stylesheet. Token classnames are compatible with prismjs
-so you can copy and adapt token styles from a prismjs stylesheet e.g. [prism themes](https://github.com/PrismJS/prism-themes).
-
-## Xdm MDX compiler
-
-We switched the MDX bundler from [next-mdx-remote](https://github.com/hashicorp/next-mdx-remote) to [mdx-bundler](https://github.com/kentcdodds/mdx-bundler).
-This uses [xdm](https://github.com/wooorm/xdm) under the hood, the latest micromark 3 and remark, rehype libraries.
-
-**Warning:** If you were using custom remark or rehype libraries, please upgrade to micromark 3 compatible ones. If you are upgrading, please delete `node_modules` and `package-lock.json` to avoid having past dependencies related issues.
-
-[xdm](https://github.com/wooorm/xdm) contains multiple improvements over [@mdx-js/mdx](https://github.com/mdx-js/mdx), the compiler used internally by next-mdx-remote, but there might be some breaking behaviour changes.
-Please check your markdown output to verify.
-
-Some new possibilities include loading components directly in the mdx file using the import syntax and including js code which could be compiled and bundled at the build step.
-
-For example, the following jsx snippet can be used directly in an MDX file to render the page title component:
-
-```jsx
-import PageTitle from './PageTitle.js'
-;<PageTitle> Using JSX components in MDX </PageTitle>
-```
-
-import PageTitle from './PageTitle.js'
-
-<PageTitle> Using JSX components in MDX </PageTitle>
-
-The default configuration resolves all components relative to the `components` directory.
-
-**Note**:
-Components which require external image loaders also require additional esbuild configuration.
-Components which are dependent on global application state on lifecycle like the Nextjs `Link` component would also not work with this setup as each mdx file is built independently.
-For such cases, it is better to use component substitution.
-
-## Table of contents component
-
-Inspired by [Docusaurus](https://docusaurus.io/docs/next/markdown-features/inline-toc) and Gatsby's [gatsby-remark-table-of-contents](https://www.gatsbyjs.com/plugins/gatsby-remark-table-of-contents/),
-the `toc` variable containing all the top level headings of the document is passed to the MDX file and can be styled accordingly.
-To make generating a table of contents (TOC) simple, you can use the existing `TOCInline` component.
-
-For example, the TOC in this post was generated with the following code:
-
-```jsx
-<TOCInline toc={props.toc} exclude="Overview" toHeading={2} />
-```
-
-You can customise the headings that are displayed by configuring the `fromHeading` and `toHeading` props, or exclude particular headings
-by passing a string or a string array to the `exclude` prop. By default, all headings that are of depth 3 or smaller are indented. This can be configured by changing the `indentDepth` property.
-A `asDisclosure` prop can be used to render the TOC within an expandable disclosure element.
-
-Here's the full TOC rendered in a disclosure element.
-
-```jsx
-<TOCInline toc={props.toc} asDisclosure />
-```
-
-<TOCInline toc={props.toc} asDisclosure />
-
-## Layouts
-
-You can map mdx blog content to layout components by configuring the frontmatter field. For example, this post is written with the new `PostSimple` layout!
-
-### Adding new templates
-
-layout templates are stored in the `./layouts` folder. You can add your React components that you want to map to markdown content in this folder.
-The component file name must match that specified in the markdown frontmatter `layout` field.
-
-The only required field is `children` which contains the rendered MDX content, though you would probably want to pass in the frontMatter contents and render it in the template.
-
-You can configure the template to take in other fields - see `PostLayout` component for an example.
-
-Here's an example layout which you can further customise:
-
-```jsx
-export default function ExampleLayout({ frontMatter, children }) {
-  const { date, title } = frontMatter
-
-  return (
-    <SectionContainer>
-      <div>{date}</div>
-      <h1>{title}</h1>
-      <div>{children}</div>
-    </SectionContainer>
-  )
-}
-```
-
-### Configuring a blog post frontmatter
-
-Use the `layout` frontmatter field to specify the template you want to map the markdown post to. Here's how the frontmatter of this post looks like:
-
-```
----
-title: 'New features in v1'
-date: '2021-05-26   '
-tags: ['next-js', 'tailwind', 'guide']
-draft: false
-summary: 'Introducing the new layout features - you can map mdx blog content to layout components by configuring the frontmatter field'
-layout: PostSimple
----
-```
-
-You can configure the default layout in the respective page section by modifying the `DEFAULT_LAYOUT` variable.
-The `DEFAULT_LAYOUT` for blog posts page is set to `PostLayout`.
-
-### Extend
-
-`layout` is mapped to wrapper which wraps the entire MDX content.
-
-```jsx
-export const MDXComponents = {
-  Image,
-  a: CustomLink,
-  pre: Pre,
-  wrapper: ({ components, layout, ...rest }) => {
-    const Layout = require(`../layouts/${layout}`).default
-    return <Layout {...rest} />
-  },
-}
-
-export const MDXLayoutRenderer = ({ layout, mdxSource, ...rest }) => {
-  const MDXLayout = useMemo(() => getMDXComponent(mdxSource), [mdxSource])
-
-  return <MDXLayout layout={layout} components={MDXComponents} {...rest} />
-}
-```
-
-Use the `MDXLayoutRenderer` component on a page where you want to accept a layout name to map to the desired layout.
-You need to pass the layout name from the layout folder (it has to be an exact match).
-
-## Analytics
-
-The template now supports [plausible](https://plausible.io/), [simple analytics](https://simpleanalytics.com/) and google analytics.
-Configure `siteMetadata.js` with the settings that correspond with the desired analytics provider.
-
-```js
-analytics: {
-    // supports plausible, simpleAnalytics or googleAnalytics
-    plausibleDataDomain: '', // e.g. tailwind-nextjs-starter-blog.vercel.app
-    simpleAnalytics: false, // true or false
-    googleAnalyticsId: '', // e.g. UA-000000-2 or G-XXXXXXX
-  },
-```
-
-Custom events are also supported. You can import the `logEvent` function from `@components/analytics/[ANALYTICS-PROVIDER]` file and call it when
-triggering certain events of interest. _Note_: Additional configuration might be required depending on the analytics provider, please check their official
-documentation for more information.
-
-## Blog comments system
-
-We have also added support for [giscus](https://github.com/laymonage/giscus), [utterances](https://github.com/utterance/utterances) or disqus.
-To enable, simply configure `siteMetadata.js` comments property with the desired provider and settings as specified in the config file.
-
-```js
-comment: {
-    // Select a provider and use the environment variables associated to it
-    // https://vercel.com/docs/environment-variables
-    provider: 'giscus', // supported providers: giscus, utterances, disqus
-    giscusConfig: {
-      // Visit the link below, and follow the steps in the 'configuration' section
-      // https://giscus.app/
-      repo: process.env.NEXT_PUBLIC_GISCUS_REPO,
-      repositoryId: process.env.NEXT_PUBLIC_GISCUS_REPOSITORY_ID,
-      category: process.env.NEXT_PUBLIC_GISCUS_CATEGORY,
-      categoryId: process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID,
-      mapping: 'pathname', // supported options: pathname, url, title
-      reactions: '1', // Emoji reactions: 1 = enable / 0 = disable
-      // Send discussion metadata periodically to the parent window: 1 = enable / 0 = disable
-      metadata: '0',
-      // theme example: light, dark, dark_dimmed, dark_high_contrast
-      // transparent_dark, preferred_color_scheme, custom
-      theme: 'light',
-      // theme when dark mode
-      darkTheme: 'transparent_dark',
-      // If the theme option above is set to 'custom`
-      // please provide a link below to your custom theme css file.
-      // example: https://giscus.app/themes/custom_example.css
-      themeURL: '',
-    },
-    utterancesConfig: {
-      // Visit the link below, and follow the steps in the 'configuration' section
-      // https://utteranc.es/
-      repo: process.env.NEXT_PUBLIC_UTTERANCES_REPO,
-      issueTerm: '', // supported options: pathname, url, title
-      label: '', // label (optional): Comment 💬
-      // theme example: github-light, github-dark, preferred-color-scheme
-      // github-dark-orange, icy-dark, dark-blue, photon-dark, boxy-light
-      theme: '',
-      // theme when dark mode
-      darkTheme: '',
-    },
-    disqus: {
-      // https://help.disqus.com/en/articles/1717111-what-s-a-shortname
-      shortname: process.env.NEXT_PUBLIC_DISQUS_SHORTNAME,
-    },
-  },
-```
-
-## Multiple authors
-
-Information on authors is now split from `siteMetadata.js` and stored in its own `data/authors` folder as a markdown file. Minimally, you will need to have a `default.md` file with authorship information. You can create additional files as required and the file name will be used as the reference to the author.
-
-Here's how an author markdown file might look like:
-
-```md:default.md
----
-name: Tails Azimuth
-avatar: /static/images/avatar.png
-occupation: Professor of Atmospheric Science
-company: Stanford University
-email: address@yoursite.com
-twitter: https://twitter.com/Twitter
-linkedin: https://www.linkedin.com
-github: https://github.com
----
-
-A long description of yourself...
-```
-
-You can use this information in multiple places across the template. For example in the about section of the page, we grab the default author information with this line of code:
-
-```js
-const authorDetails = await getFileBySlug('authors', ['default'])
-```
-
-This is rendered in the `AuthorLayout` template.
-
-### Multiple authors in blog post
-
-The frontmatter of a blog post accepts an optional `authors` array field. If no field is specified, it is assumed that the default author is used. Simply pass in an array of authors to render multiple authors associated with a post.
-
-For example, the following frontmatter will display the authors given by `data/authors/default.md` and `data/authors/sparrowhawk.md`
-
-```yaml
-title: 'My first post'
-date: '2021-01-12'
-draft: false
-summary: 'My first post'
-authors: ['default', 'sparrowhawk']
-```
-
-A demo of a multiple authors post is shown in [Introducing Tailwind Nextjs Starter Blog post](/blog/introducing-tailwind-nextjs-starter-blog).
-
-## Copy button for code blocks
-
-Hover over a code block and you will notice a GitHub-inspired copy button! You can modify `./components/Pre.js` to further customise it.
-The component is passed to `MDXComponents` and modifies all `<pre>` blocks.
-
-## Line highlighting and line numbers
-
-Line highlighting and line numbers are now supported out of the box thanks to the new [rehype-prism-plus plugin](https://github.com/timlrx/rehype-prism-plus)
-
-The following javascript code block:
-
-````
-```js {1, 3-4} showLineNumbers
-var num1, num2, sum
-num1 = prompt('Enter first number')
-num2 = prompt('Enter second number')
-sum = parseInt(num1) + parseInt(num2) // "+" means "add"
-alert('Sum = ' + sum) // "+" means combine into a string
-```
-````
-
-will appear as:
-
-```js {1,3-4} showLineNumbers
-var num1, num2, sum
-num1 = prompt('Enter first number')
-num2 = prompt('Enter second number')
-sum = parseInt(num1) + parseInt(num2) // "+" means "add"
-alert('Sum = ' + sum) // "+" means combine into a string
-```
-
-To modify the styles, change the following class selectors in the `prism.css` file:
-
-```css
-.code-highlight {
-  @apply float-left min-w-full;
-}
-
-.code-line {
-  @apply -mx-4 block border-l-4 border-opacity-0 pl-4 pr-4;
-}
-
-.code-line.inserted {
-  @apply bg-green-500 bg-opacity-20;
-}
-
-.code-line.deleted {
-  @apply bg-red-500 bg-opacity-20;
-}
-
-.highlight-line {
-  @apply -mx-4 border-l-4 border-primary-500 bg-gray-700 bg-opacity-50;
-}
-
-.line-number::before {
-  @apply mr-4 -ml-2 inline-block w-4 text-right text-gray-400;
-  content: attr(line);
-}
-```
-
-## Newletter component (v1.1.3)
-
-Introduced in v1.1.3, the newsletter component gives you an easy way to build an audience. It integrates with the following providers:
-
-- [Mailchimp](https://mailchimp.com/)
-- [Buttondown](https://buttondown.email/)
-- [Convertkit](https://convertkit.com/)
-
-To use it, specify the provider which you are using in the config file and add the necessary environment variables to the `.env` file.
-For more information on the required variables, check out `.env.sample.`
-
-Two components are exported, a default `NewsletterForm` and a `BlogNewsletterForm` component, which is also passed in as an MDX component
-and can be used in a blog post:
-
-```jsx
-<BlogNewsletterForm title="Like what you are reading?" />
-```
-
-<BlogNewsletterForm title="Like what you are reading?" />
-
-The component relies on nextjs's [API routes](https://nextjs.org/docs/api-routes/introduction) which requires a server-side instance of nextjs to be setup
-and is not compatible with a 100% static site export. Users should either self-host or use a compatible platform like Vercel or Netlify which supports this functionality.
-
-A static site compatible alternative is to substitute the route in the newsletter component with a form API endpoint provider.
-
-## Bibliography and Citations (v1.2.1)
-
-`rehype-citation` plugin is added to the xdm processing pipeline in v1.2.1. This allows you to easily format citations and insert bibliography from an existing bibtex or CSL-json file.
-
-For example, the following markdown code sample:
-
-```md
-Standard citation [@Nash1950]
-In-text citations e.g. @Nash1951
-Multiple citations [see @Nash1950; @Nash1951, page 50]
-
-**References:**
-
-[^ref]
-```
-
-is rendered to the following:
-
-Standard citation [@Nash1950]  
-In-text citations e.g. @Nash1951  
-Multiple citations [see @Nash1950; @Nash1951, page 50]
-
-**References:**
-
-[^ref]
-
-A bibliography will be inserted at the end of the document, but this can be overwritten by specifying a `[^Ref]` tag at the intended location.
-The plugin uses APA citation formation, but also supports the following CSLs, 'apa', 'vancouver', 'harvard1', 'chicago', 'mla', or a path to a user-specified CSL file.
-
-See [rehype-citation readme](https://github.com/timlrx/rehype-citation) for more information on the configuration options.
-
-## Self-hosted font (v1.5.0)
-
-Google font has been replaced with self-hosted font from [Fontsource](https://fontsource.org/). This gives the following [advantages](https://fontsource.org/docs/introduction):
-
-> Self-hosting brings significant performance gains as loading fonts from hosted services, such as Google Fonts, lead to an extra (render blocking) network request. To provide perspective, for simple websites it has been seen to double visual load times.
->
-> Fonts remain version locked. Google often pushes updates to their fonts without notice, which may interfere with your live production projects. Manage your fonts like any other NPM dependency.
->
-> Commit to privacy. Google does track the usage of their fonts and for those who are extremely privacy concerned, self-hosting is an alternative.
-
-This leads to a smaller font bundle and a 0.1s faster load time ([webpagetest comparison](https://www.webpagetest.org/video/compare.php?tests=220201_AiDcFH_f68a69b758454dd52d8e67493fdef7da,220201_BiDcMC_bf2d53f14483814ba61e794311dfa771)).
-
-To change the default Inter font:
-
-1. Install the preferred [font](https://fontsource.org/fonts) - `npm install -save @fontsource/<font-name>`
-2. Update the import at `pages/_app.js`- `import '@fontsource/<font-name>.css'`
-3. Update the `fontfamily` property in the tailwind css config file
-
-## Upgrade guide
-
-There are significant portions of the code that has been changed from v0 to v1 including support for layouts and a new mdx engine.
-
-There's also no real reason to change if the previous one serves your needs and it might be easier to copy
-the component changes you are interested in to your existing blog rather than migrating everything over.
-
-Nonetheless, if you want to do so and have not changed much of the template, you could clone the new version and copy over the blog post over to the new template.
-
-Another alternative would be to pull the latest template version with the following code:
-
-```bash
-git remote add template git@github.com:timlrx/tailwind-nextjs-starter-blog.git
-git pull template v1 --allow-unrelated-histories
-rm -rf node_modules
-```
-
-You can see an example of such a migration in this [commit](https://github.com/timlrx/timlrx.com/commit/bba1c185384fd6d5cdaac15abf802fdcff027286) for my personal blog.
-
-v1 also uses `feed.xml` rather than `index.xml`, to avoid some build issues with Vercel. If you are migrating you should add a redirect to `next.config.js` like so:
-
-```js
-async redirects() {
-  return [
-    {
-      source: '/:path/index.xml',
-      destination: '/:path/feed.xml',
-      permanent: true,
-    }
-  ]
-}
-```
+## 질문 제목: 
+
+비동기 호출에서 응답을 어떻게 반환합니까?
+        
+## 질문 내용:
+        
+<p><font style="vertical-align: inherit;"></font><code>foo</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">비동기 요청을 </font><font style="vertical-align: inherit;">하는 함수에서 응답/결과를 어떻게 반환 합니까?</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백에서 값을 반환하고 결과를 함수 내부의 로컬 변수에 할당하고 해당 변수를 반환하려고 하지만 이러한 방법 중 어느 것도 실제로 응답을 반환하지 않습니다. 모두 반환 </font></font><code>undefined</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">하거나 변수의 초기 값이 무엇이든 간에 </font></font><code>result</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">이다.</font></font></p>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백을 수락하는 비동기 함수의 예</font></font></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> (jQuery의 </font></font><code>ajax</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">함수 사용):</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">var</span> result;<font></font>
+<font></font>
+    $.<span class="hljs-title function_">ajax</span>({
+        <span class="hljs-attr">url</span>: <span class="hljs-string">'...'</span>,
+        <span class="hljs-attr">success</span>: <span class="hljs-keyword">function</span>(<span class="hljs-params">response</span>) {<font></font>
+            result = response;<font></font>
+            <span class="hljs-comment">// return response; // &lt;- I tried that one as well</span><font></font>
+        }<font></font>
+    });<font></font>
+<font></font>
+    <span class="hljs-keyword">return</span> result; <span class="hljs-comment">// It always returns `undefined`</span><font></font>
+}<font></font>
+</code></pre>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Node.js를 사용하는 예:</font></font></strong></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">var</span> result;<font></font>
+<font></font>
+    fs.<span class="hljs-title function_">readFile</span>(<span class="hljs-string">"path/to/file"</span>, <span class="hljs-keyword">function</span>(<span class="hljs-params">err, data</span>) {<font></font>
+        result = data;<font></font>
+        <span class="hljs-comment">// return data; // &lt;- I tried that one as well</span><font></font>
+    });<font></font>
+<font></font>
+    <span class="hljs-keyword">return</span> result; <span class="hljs-comment">// It always returns `undefined`</span><font></font>
+}<font></font>
+</code></pre>
+<p><strong><font style="vertical-align: inherit;"></font><code>then</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">약속 블록을 </font><font style="vertical-align: inherit;">사용하는 예 :</font></font></strong></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">var</span> result;<font></font>
+<font></font>
+    <span class="hljs-title function_">fetch</span>(url).<span class="hljs-title function_">then</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">response</span>) {<font></font>
+        result = response;<font></font>
+        <span class="hljs-comment">// return response; // &lt;- I tried that one as well</span><font></font>
+    });<font></font>
+<font></font>
+    <span class="hljs-keyword">return</span> result; <span class="hljs-comment">// It always returns `undefined`</span><font></font>
+}<font></font>
+</code></pre>
+       
+## 해결 답변:
+
+<blockquote>
+ <p><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">→ 다른 예를 사용한 비동기 동작에 대한 보다 일반적인 설명은 </font></font></em> <a href="https://stackoverflow.com/q/23667086/218196"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">함수 내에서 변수를 수정한 후 변수가 변경되지 않는 이유는 무엇입니까?를 참조하십시오. </font><font style="vertical-align: inherit;">- 비동기 코드 참조</font></font></a></p>
+ <p><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">→ 문제를 이미 이해했다면 아래의 가능한 해결 방법으로 건너뛰십시오.</font></font></em></p>
+</blockquote>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">문제</font></font></h2>
+<p><font style="vertical-align: inherit;"><a href="https://en.wikipedia.org/wiki/Ajax_(programming)" rel="noreferrer"><font style="vertical-align: inherit;">Ajax</font></a><font style="vertical-align: inherit;"> 의 </font></font><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">A</font></font></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 는 </font><a href="https://www.merriam-webster.com/dictionary/asynchronous" rel="noreferrer"><strong><font style="vertical-align: inherit;">asynchronous</font></strong></a><font style="vertical-align: inherit;"> 를 의미합니다 </font><font style="vertical-align: inherit;">. </font><font style="vertical-align: inherit;">즉, 요청 보내기(또는 응답 받기)가 정상적인 실행 흐름에서 제외됩니다. </font><font style="vertical-align: inherit;">귀하의 예에서 </font><font style="vertical-align: inherit;">즉시 반환하고 다음 명령문인 은 </font><font style="vertical-align: inherit;">콜백으로 </font><font style="vertical-align: inherit;">전달한 함수가 호출되기 전에 실행됩니다 .</font></font><a href="https://en.wikipedia.org/wiki/Ajax_(programming)" rel="noreferrer"><font style="vertical-align: inherit;"></font></a><font style="vertical-align: inherit;"></font><a href="https://www.merriam-webster.com/dictionary/asynchronous" rel="noreferrer"><strong><font style="vertical-align: inherit;"></font></strong></a><font style="vertical-align: inherit;"></font><code>$.ajax</code><font style="vertical-align: inherit;"></font><code>return result;</code><font style="vertical-align: inherit;"></font><code>success</code><font style="vertical-align: inherit;"></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">다음은 동기식 흐름과 비동기식 흐름의 차이를 더 명확하게 만드는 비유입니다.</font></font></p>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">동기식</font></font></h2>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">당신이 친구에게 전화를 걸어 당신을 위해 무언가를 찾아달라고 부탁한다고 상상해보십시오. </font><font style="vertical-align: inherit;">시간이 좀 걸릴 수 있지만 친구가 필요한 답을 줄 때까지 전화를 기다리며 허공을 응시합니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">"일반" 코드를 포함하는 함수 호출을 수행할 때도 마찬가지입니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">findItem</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">var</span> item;
+    <span class="hljs-keyword">while</span>(item_not_found) {
+        <span class="hljs-comment">// search</span><font></font>
+    }<font></font>
+    <span class="hljs-keyword">return</span> item;<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-keyword">var</span> item = <span class="hljs-title function_">findItem</span>();<font></font>
+<font></font>
+<span class="hljs-comment">// Do something with item</span>
+<span class="hljs-title function_">doSomethingElse</span>();
+</code></pre>
+<p><font style="vertical-align: inherit;"></font><code>findItem</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">실행하는 데 시간이 오래 걸리 </font><font style="vertical-align: inherit;">더라도 이후 </font></font><code>var item = findItem();</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">에 오는 모든 코드 </font><font style="vertical-align: inherit;">는 함수가 결과를 반환할 때까지 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">기다려야 합니다.</font></font></em><font style="vertical-align: inherit;"></font></p>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">비동기식</font></font></h2>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">같은 이유로 친구에게 다시 전화를 겁니다. </font><font style="vertical-align: inherit;">하지만 이번에는 당신이 바쁘다고 그에게 말하고 그는 </font><font style="vertical-align: inherit;">당신의 휴대폰 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">으로 다시 전화를 걸어야 합니다. </font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">당신은 전화를 끊고, 집을 떠나, 당신이 계획한 모든 것을 합니다. </font><font style="vertical-align: inherit;">친구가 다시 전화를 걸면 그가 준 정보를 처리하는 것입니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">이것이 바로 Ajax 요청을 할 때 일어나는 일입니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-title function_">findItem</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">item</span>) {
+    <span class="hljs-comment">// Do something with the item</span><font></font>
+});<font></font>
+<span class="hljs-title function_">doSomethingElse</span>();
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">응답을 기다리는 대신 실행이 즉시 계속되고 Ajax 호출 후 명령문이 실행됩니다. </font><font style="vertical-align: inherit;">결국 응답을 받으려면 응답을 받은 후 호출할 함수인 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> (뭔가 알아차리셨나요? </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> ?)을 제공합니다. </font><font style="vertical-align: inherit;">해당 호출 이후에 오는 명령문은 콜백이 호출되기 전에 실행됩니다.</font></font></p>
+<hr>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">솔루션</font></font></h2>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">JavaScript의 비동기 특성을 수용하십시오! </font></font></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">특정 비동기 작업은 동기 대응 작업을 제공하지만("Ajax"도 마찬가지임) 일반적으로 특히 브라우저 컨텍스트에서 사용하지 않는 것이 좋습니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">왜 나쁜가요?</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">JavaScript는 브라우저의 UI 스레드에서 실행되며 장기 실행 프로세스는 UI를 잠가 응답하지 않게 만듭니다. </font><font style="vertical-align: inherit;">또한 JavaScript의 실행 시간에는 상한이 있으며 브라우저는 사용자에게 실행을 계속할지 여부를 묻습니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">이 모든 것이 정말 나쁜 사용자 경험을 초래합니다. </font><font style="vertical-align: inherit;">사용자는 모든 것이 제대로 작동하는지 여부를 알 수 없습니다. </font><font style="vertical-align: inherit;">또한 연결 속도가 느린 사용자에게는 그 효과가 더 나빠집니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">다음에서는 모두 서로 위에 구축되는 세 가지 솔루션을 살펴보겠습니다.</font></font></p>
+<ul>
+ <li><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise with</font></font><code>async/await</code></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> (ES2017+, 트랜스파일러 또는 재생기를 사용하는 경우 이전 브라우저에서 사용 가능)</font></font></li>
+ <li><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백</font></font></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> (노드에서 인기 있음)</font></font></li>
+ <li><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise with</font></font><code>then()</code></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> (ES2015+, 많은 Promise 라이브러리 중 하나를 사용하는 경우 이전 브라우저에서 사용 가능)</font></font></li>
+</ul>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">세 가지 모두 현재 브라우저와 노드 7+에서 사용할 수 있습니다.</font></font></strong></p>
+<hr>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">ES2017+: 약속</font></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function" rel="noreferrer"><code>async/await</code></a></h2>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">2017년에 출시된 ECMAScript 버전 </font><font style="vertical-align: inherit;">은 비동기 함수에 대한 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">구문 수준 지원 을 도입했습니다. </font></font></em><font style="vertical-align: inherit;"></font><code>async</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">및 </font><font style="vertical-align: inherit;">의 도움으로 </font></font><code>await</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">비동기식을 "동기식 스타일"로 작성할 수 있습니다. </font><font style="vertical-align: inherit;">코드는 여전히 비동기식이지만 읽고 이해하기가 더 쉽습니다.</font></font></p>
+<p><code>async/await</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">약속 위에 구축: </font></font><code>async</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">함수는 항상 약속을 반환합니다. </font></font><code>await</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">약속을 "풀고" 약속이 해결된 값을 가져오거나 약속이 거부된 경우 오류를 발생시킵니다.</font></font></p>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">중요:</font></font></strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 함수 </font></font><code>await</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">내부 또는 </font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules" rel="noreferrer"><font style="vertical-align: inherit;">JavaScript 모듈</font></a><font style="vertical-align: inherit;"> 에서만 사용할 수 있습니다 </font><font style="vertical-align: inherit;">. </font><font style="vertical-align: inherit;">최상위 수준 은 모듈 외부에서 지원되지 않으므로 모듈 </font><font style="vertical-align: inherit;">을 사용하지 않는 경우 컨텍스트 </font><font style="vertical-align: inherit;">를 시작하려면 비동기 IIFE( </font><a href="https://en.wikipedia.org/wiki/Immediately_invoked_function_expression" rel="noreferrer"><font style="vertical-align: inherit;">즉시 호출 함수 표현식</font></a><font style="vertical-align: inherit;"> ) 를 만들어야 할 수 있습니다 .</font></font><code>async</code><font style="vertical-align: inherit;"></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules" rel="noreferrer"><font style="vertical-align: inherit;"></font></a><font style="vertical-align: inherit;"></font><code>await</code><font style="vertical-align: inherit;"></font><a href="https://en.wikipedia.org/wiki/Immediately_invoked_function_expression" rel="noreferrer"><font style="vertical-align: inherit;"></font></a><font style="vertical-align: inherit;"></font><code>async</code><font style="vertical-align: inherit;"></font></p>
+<p><font style="vertical-align: inherit;"></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function" rel="noreferrer"><code>async</code></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">MDN 에 </font><font style="vertical-align: inherit;">대한 자세한 내용은 MDN에서 읽을 수 있습니다 </font></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await" rel="noreferrer"><code>await</code></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">위 의 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">지연</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 기능 </font><font style="vertical-align: inherit;">을 자세히 설명하는 예는 다음과 같습니다 .</font></font><code>findItem()</code><font style="vertical-align: inherit;"></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-comment">// Using 'superagent' which will return a promise.</span>
+<span class="hljs-keyword">var</span> superagent = <span class="hljs-built_in">require</span>(<span class="hljs-string">'superagent'</span>)<font></font>
+<font></font>
+<span class="hljs-comment">// This is isn't declared as `async` because it already returns a promise</span>
+<span class="hljs-keyword">function</span> <span class="hljs-title function_">delay</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-comment">// `delay` returns a promise</span>
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Promise</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">resolve, reject</span>) {
+    <span class="hljs-comment">// Only `delay` is able to resolve or reject the promise</span>
+    <span class="hljs-built_in">setTimeout</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) {
+      <span class="hljs-title function_">resolve</span>(<span class="hljs-number">42</span>); <span class="hljs-comment">// After 3 seconds, resolve the promise with value 42</span>
+    }, <span class="hljs-number">3000</span>);<font></font>
+  });<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span> <span class="hljs-title function_">getAllBooks</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-comment">// GET a list of book IDs of the current user</span>
+    <span class="hljs-keyword">var</span> bookIDs = <span class="hljs-keyword">await</span> superagent.<span class="hljs-title function_">get</span>(<span class="hljs-string">'/user/books'</span>);
+    <span class="hljs-comment">// wait for 3 seconds (just for the sake of this example)</span>
+    <span class="hljs-keyword">await</span> <span class="hljs-title function_">delay</span>();
+    <span class="hljs-comment">// GET information about each book</span>
+    <span class="hljs-keyword">return</span> superagent.<span class="hljs-title function_">get</span>(<span class="hljs-string">'/books/ids='</span>+<span class="hljs-title class_">JSON</span>.<span class="hljs-title function_">stringify</span>(bookIDs));<font></font>
+  } <span class="hljs-keyword">catch</span>(error) {
+    <span class="hljs-comment">// If any of the awaited promises was rejected, this catch block</span>
+    <span class="hljs-comment">// would catch the rejection reason</span>
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">null</span>;<font></font>
+  }<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-comment">// Start an IIFE to use `await` at the top level</span>
+(<span class="hljs-keyword">async</span> <span class="hljs-keyword">function</span>(<span class="hljs-params"></span>){
+  <span class="hljs-keyword">let</span> books = <span class="hljs-keyword">await</span> <span class="hljs-title function_">getAllBooks</span>();
+  <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(books);<font></font>
+})();<font></font>
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">현재 </font></font><a href="https://kangax.github.io/compat-table/es2016plus/#test-async_functions" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">브라우저</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 및 </font></font><a href="http://node.green/#ES2017-features-async-functions" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">노드</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 버전은 </font></font><code>async/await</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">. </font></font><a href="https://github.com/facebook/regenerator" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">또한 regenerator (또는 </font></font></a><font style="vertical-align: inherit;"></font><a href="https://babeljs.io/" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Babel</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 과 같이 regenerator를 사용하는 도구 </font><font style="vertical-align: inherit;">)의 도움으로 코드를 ES5로 변환하여 이전 환경을 지원할 수 있습니다 </font><font style="vertical-align: inherit;">.</font></font></p>
+<hr>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">함수가 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백 을 수락하도록 허용</font></font></em></h2>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백은 함수 1이 함수 2로 전달되는 경우입니다. 함수 2는 준비가 될 때마다 함수 1을 호출할 수 있습니다. </font><font style="vertical-align: inherit;">비동기 프로세스의 컨텍스트에서 콜백은 비동기 프로세스가 완료될 때마다 호출됩니다. </font><font style="vertical-align: inherit;">일반적으로 결과는 콜백으로 전달됩니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">질문의 예에서 콜백을 </font></font><code>foo</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">수락하고 콜백으로 사용할 수 있습니다 </font></font><code>success</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">. </font><font style="vertical-align: inherit;">그래서 이거</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">var</span> result = <span class="hljs-title function_">foo</span>();
+<span class="hljs-comment">// Code that depends on 'result'</span>
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">된다</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-title function_">foo</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">result</span>) {
+    <span class="hljs-comment">// Code that depends on 'result'</span><font></font>
+});<font></font>
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">여기에서 "인라인" 함수를 정의했지만 모든 함수 참조를 전달할 수 있습니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">myCallback</span>(<span class="hljs-params">result</span>) {
+    <span class="hljs-comment">// Code that depends on 'result'</span><font></font>
+}<font></font>
+<font></font>
+<span class="hljs-title function_">foo</span>(myCallback);
+</code></pre>
+<p><code>foo</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">자체는 다음과 같이 정의됩니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params">callback</span>) {<font></font>
+    $.<span class="hljs-title function_">ajax</span>({
+        <span class="hljs-comment">// ...</span>
+        <span class="hljs-attr">success</span>: callback<font></font>
+    });<font></font>
+}<font></font>
+</code></pre>
+<p><code>callback</code><font style="vertical-align: inherit;"></font><code>foo</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">호출할 때 </font><font style="vertical-align: inherit;">전달하는 함수를 참조하고 에 전달할 것입니다 </font></font><code>success</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">. </font><font style="vertical-align: inherit;">즉, Ajax 요청이 성공 하면 응답을 </font></font><code>$.ajax</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">호출 하고 콜백에 전달합니다( 콜백 </font><font style="vertical-align: inherit;">을 정의한 방법이므로 </font></font><code>callback</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">로 참조할 수 있음 ).</font></font><code>result</code><font style="vertical-align: inherit;"></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백에 전달하기 전에 응답을 처리할 수도 있습니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params">callback</span>) {<font></font>
+    $.<span class="hljs-title function_">ajax</span>({
+        <span class="hljs-comment">// ...</span>
+        <span class="hljs-attr">success</span>: <span class="hljs-keyword">function</span>(<span class="hljs-params">response</span>) {
+            <span class="hljs-comment">// For example, filter the response</span>
+            <span class="hljs-title function_">callback</span>(filtered_response);<font></font>
+        }<font></font>
+    });<font></font>
+}<font></font>
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백을 사용하여 코드를 작성하는 것이 생각보다 쉽습니다. </font><font style="vertical-align: inherit;">결국 브라우저의 JavaScript는 주로 이벤트 기반(DOM 이벤트)입니다. </font><font style="vertical-align: inherit;">Ajax 응답을 받는 것은 다름 아닌 이벤트입니다. </font><font style="vertical-align: inherit;">타사 코드로 작업해야 하는 경우 어려움이 발생할 수 있지만 대부분의 문제는 애플리케이션 흐름을 생각하는 것만으로도 해결할 수 있습니다.</font></font></p>
+<hr>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">ES2015+: </font></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">then()을 사용한 약속</font></font></a></h2>
+<p><font style="vertical-align: inherit;"></font><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise API</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 는 ECMAScript 6(ES2015) 의 </font><font style="vertical-align: inherit;">새로운 기능이지만 이미 </font></font><a href="http://caniuse.com/#feat=promises" rel="noreferrer" title="사용해도 되나요"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">브라우저 지원</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 이 우수합니다 . </font></font><a href="https://github.com/petkaantonov/bluebird" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">또한 표준 Promises API를 구현하고 비동기 함수(예: bluebird</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> ) 의 사용 및 구성을 용이하게 하는 추가 메서드를 제공하는 많은 라이브러리가 있습니다 </font><font style="vertical-align: inherit;">.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">약속은 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">미래</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 가치를 담는 그릇입니다. </font><font style="vertical-align: inherit;">약속이 값을 수신하거나( </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">해결됨</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> ) 취소될 때( </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">거부</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 됨 ) 이 값에 액세스하려는 모든 "수신자"에게 알립니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">일반 콜백에 비해 장점은 코드를 분리할 수 있고 구성하기가 더 쉽다는 것입니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">다음은 약속을 사용하는 예입니다.</font></font></p>
+<p></p>
+<div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+ <div class="snippet-code">
+  <pre class="snippet-code-js lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">delay</span>(<span class="hljs-params"></span>) {
+  <span class="hljs-comment">// `delay` returns a promise</span>
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Promise</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">resolve, reject</span>) {
+    <span class="hljs-comment">// Only `delay` is able to resolve or reject the promise</span>
+    <span class="hljs-built_in">setTimeout</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) {
+      <span class="hljs-title function_">resolve</span>(<span class="hljs-number">42</span>); <span class="hljs-comment">// After 3 seconds, resolve the promise with value 42</span>
+    }, <span class="hljs-number">3000</span>);<font></font>
+  });<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-title function_">delay</span>()<font></font>
+  .<span class="hljs-title function_">then</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">v</span>) { <span class="hljs-comment">// `delay` returns a promise</span>
+    <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(v); <span class="hljs-comment">// Log the value once it is resolved</span><font></font>
+  })<font></font>
+  .<span class="hljs-title function_">catch</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">v</span>) {
+    <span class="hljs-comment">// Or do something else if it is rejected</span>
+    <span class="hljs-comment">// (it would not happen in this example, since `reject` is not called).</span>
+  });</code></pre>
+  <pre class="snippet-code-css lang-css s-code-block"><code class="hljs language-css"><span class="hljs-selector-class">.as-console-wrapper</span> { <span class="hljs-attribute">max-height</span>: <span class="hljs-number">100%</span> <span class="hljs-meta">!important</span>; <span class="hljs-attribute">top</span>: <span class="hljs-number">0</span>; }</code></pre>
+ </div>
+</div>
+<p></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Ajax 호출에 적용하면 다음과 같은 약속을 사용할 수 있습니다.</font></font></p>
+<p></p>
+<div class="snippet" data-lang="js" data-hide="false" data-console="true" data-babel="false">
+ <div class="snippet-code">
+  <pre class="snippet-code-js lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">ajax</span>(<span class="hljs-params">url</span>) {
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> <span class="hljs-title class_">Promise</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">resolve, reject</span>) {
+    <span class="hljs-keyword">var</span> xhr = <span class="hljs-keyword">new</span> <span class="hljs-title class_">XMLHttpRequest</span>();<font></font>
+    xhr.<span class="hljs-property">onload</span> = <span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) {
+      <span class="hljs-title function_">resolve</span>(<span class="hljs-variable language_">this</span>.<span class="hljs-property">responseText</span>);<font></font>
+    };<font></font>
+    xhr.<span class="hljs-property">onerror</span> = reject;<font></font>
+    xhr.<span class="hljs-title function_">open</span>(<span class="hljs-string">'GET'</span>, url);<font></font>
+    xhr.<span class="hljs-title function_">send</span>();<font></font>
+  });<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-title function_">ajax</span>(<span class="hljs-string">"https://jsonplaceholder.typicode.com/todos/1"</span>)<font></font>
+  .<span class="hljs-title function_">then</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">result</span>) {
+    <span class="hljs-variable language_">console</span>.<span class="hljs-title function_">log</span>(result); <span class="hljs-comment">// Code depending on result</span><font></font>
+  })<font></font>
+  .<span class="hljs-title function_">catch</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-comment">// An error occurred</span>
+  });</code></pre>
+  <pre class="snippet-code-css lang-css s-code-block"><code class="hljs language-css"><span class="hljs-selector-class">.as-console-wrapper</span> { <span class="hljs-attribute">max-height</span>: <span class="hljs-number">100%</span> <span class="hljs-meta">!important</span>; <span class="hljs-attribute">top</span>: <span class="hljs-number">0</span>; }</code></pre>
+ </div>
+</div>
+<p></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise가 제공하는 모든 이점을 설명하는 것은 이 답변의 범위를 벗어나지만 새 코드를 작성하는 경우 이를 심각하게 고려해야 합니다. </font><font style="vertical-align: inherit;">코드의 훌륭한 추상화 및 분리를 제공합니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise 에 대한 추가 정보: </font></font><a href="http://www.html5rocks.com/en/tutorials/es6/promises/" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">HTML5 Rocks - JavaScript Promises</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> .</font></font></p>
+<h3><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">참고: jQuery의 지연된 개체</font></font></h3>
+<p><a href="https://stackoverflow.com/questions/4866721/what-are-deferred-objects"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">지연된 개체</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 는 jQuery의 약속에 대한 사용자 지정 구현입니다(Promise API가 표준화되기 전). </font><font style="vertical-align: inherit;">거의 약속처럼 작동하지만 약간 다른 API를 노출합니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">jQuery의 모든 Ajax 메서드는 함수에서 반환할 수 있는 "지연 객체"(실제로는 지연 객체의 약속)를 이미 반환합니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">ajax</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">return</span> $.<span class="hljs-title function_">ajax</span>(...);<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-title function_">ajax</span>().<span class="hljs-title function_">done</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">result</span>) {
+    <span class="hljs-comment">// Code depending on result</span>
+}).<span class="hljs-title function_">fail</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-comment">// An error occurred</span><font></font>
+});<font></font>
+</code></pre>
+<h3><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">참고 사항: Promise gotchas</font></font></h3>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">Promise와 Deferred Object는 미래 가치를 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">담는 그릇</font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 일 뿐, 가치 자체는 아니라는 점을 명심하세요. </font><font style="vertical-align: inherit;">예를 들어 다음이 있다고 가정합니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">checkPassword</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">return</span> $.<span class="hljs-title function_">ajax</span>({
+        <span class="hljs-attr">url</span>: <span class="hljs-string">'/password'</span>,
+        <span class="hljs-attr">data</span>: {
+            <span class="hljs-attr">username</span>: $(<span class="hljs-string">'#username'</span>).<span class="hljs-title function_">val</span>(),
+            <span class="hljs-attr">password</span>: $(<span class="hljs-string">'#password'</span>).<span class="hljs-title function_">val</span>()<font></font>
+        },<font></font>
+        <span class="hljs-attr">type</span>: <span class="hljs-string">'POST'</span>,
+        <span class="hljs-attr">dataType</span>: <span class="hljs-string">'json'</span><font></font>
+    });<font></font>
+}<font></font>
+<font></font>
+<span class="hljs-keyword">if</span> (<span class="hljs-title function_">checkPassword</span>()) {
+    <span class="hljs-comment">// Tell the user they're logged in</span><font></font>
+}<font></font>
+</code></pre>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">이 코드는 위의 비동기 문제를 잘못 이해하고 있습니다. </font><font style="vertical-align: inherit;">특히 </font></font><code>$.ajax()</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">서버에서 '/password' 페이지를 확인하는 동안 코드를 동결하지 않습니다. 서버에 요청을 보내고 대기하는 동안 서버의 응답이 아닌 jQuery Ajax Deferred 개체를 즉시 반환합니다. </font><font style="vertical-align: inherit;">즉, </font></font><code>if</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">명령문은 항상 이 Deferred 개체를 가져오고 로 취급 </font></font><code>true</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">하며 사용자가 로그인한 것처럼 진행합니다. 좋지 않습니다.</font></font></p>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">그러나 수정은 쉽습니다.</font></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-title function_">checkPassword</span>()<font></font>
+.<span class="hljs-title function_">done</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">r</span>) {
+    <span class="hljs-keyword">if</span> (r) {
+        <span class="hljs-comment">// Tell the user they're logged in</span>
+    } <span class="hljs-keyword">else</span> {
+        <span class="hljs-comment">// Tell the user their password was bad</span><font></font>
+    }<font></font>
+})<font></font>
+.<span class="hljs-title function_">fail</span>(<span class="hljs-keyword">function</span>(<span class="hljs-params">x</span>) {
+    <span class="hljs-comment">// Tell the user something bad happened</span><font></font>
+});<font></font>
+</code></pre>
+<hr>
+<h2><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">권장되지 않음: 동기식 "Ajax" 호출</font></font></h2>
+<p><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">내가 언급했듯이 일부(!) 비동기 작업에는 동기 작업이 있습니다. </font><font style="vertical-align: inherit;">나는 그것들의 사용을 옹호하지는 않지만 완전성을 위해 동기 호출을 수행하는 방법은 다음과 같습니다.</font></font></p>
+<h3><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">jQuery를 사용하지 않고</font></font></h3>
+<p><font style="vertical-align: inherit;"></font><a href="https://xhr.spec.whatwg.org/" rel="noreferrer"><code>XMLHttpRequest</code></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">객체 </font><font style="vertical-align: inherit;">를 직접 사용하는 경우 </font></font><code>false</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">세 번째 인수로 에 전달하십시오 </font></font><a href="https://xhr.spec.whatwg.org/#the-open()-method" rel="noreferrer"><code>.open</code></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">.</font></font></p>
+<h3><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">jQuery</font></font></h3>
+<p><font style="vertical-align: inherit;"></font><a href="http://api.jquery.com/jQuery.ajax/" rel="noreferrer"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">jQuery</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 를 사용하는 경우 </font></font><code>async</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">옵션을 로 </font><font style="vertical-align: inherit;">설정할 수 있습니다 </font></font><code>false</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">. </font><font style="vertical-align: inherit;">이 옵션은 </font><font style="vertical-align: inherit;">jQuery 1.8부터 </font></font><em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">사용되지 않습니다 . </font></font></em><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">그런 다음 여전히 </font></font><code>success</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">콜백을 사용하거나 </font><a href="http://api.jquery.com/jQuery.ajax/#jqXHR" rel="noreferrer"><font style="vertical-align: inherit;">jqXHR 객체</font></a></font><code>responseText</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 의 속성에 액세스할 수 있습니다 </font><font style="vertical-align: inherit;">.</font></font><a href="http://api.jquery.com/jQuery.ajax/#jqXHR" rel="noreferrer"><font style="vertical-align: inherit;"></font></a><font style="vertical-align: inherit;"></font></p>
+<pre class="lang-js s-code-block"><code class="hljs language-javascript"><span class="hljs-keyword">function</span> <span class="hljs-title function_">foo</span>(<span class="hljs-params"></span>) {
+    <span class="hljs-keyword">var</span> jqXHR = $.<span class="hljs-title function_">ajax</span>({
+        <span class="hljs-comment">//...</span>
+        <span class="hljs-attr">async</span>: <span class="hljs-literal">false</span><font></font>
+    });<font></font>
+    <span class="hljs-keyword">return</span> jqXHR.<span class="hljs-property">responseText</span>;<font></font>
+}<font></font>
+</code></pre>
+<p><font style="vertical-align: inherit;"></font><code>$.get</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">, </font><font style="vertical-align: inherit;">등의 다른 jQuery Ajax 메소드를 사용하는 경우 </font></font><code>$.getJSON</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">로 변경해야 합니다 </font></font><code>$.ajax</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">( 에는 구성 매개변수만 전달할 수 있으므로 </font></font><code>$.ajax</code><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">).</font></font></p>
+<p><strong><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">주의! </font></font></strong><font style="vertical-align: inherit;"></font><a href="https://stackoverflow.com/questions/2067472/please-explain-jsonp"><font style="vertical-align: inherit;"><font style="vertical-align: inherit;">동기식 JSONP</font></font></a><font style="vertical-align: inherit;"><font style="vertical-align: inherit;"> 요청 </font><font style="vertical-align: inherit;">을 할 수 없습니다 . </font><font style="vertical-align: inherit;">JSONP는 본질적으로 항상 비동기식입니다(이 옵션을 고려하지 않는 또 하나의 이유).</font></font></p>
